@@ -8,7 +8,6 @@ import net.kyori.adventure.audience.Audience;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.format.NamedTextColor;
-import org.apache.commons.lang.exception.ExceptionUtils;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
@@ -21,7 +20,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.net.HttpURLConnection;
+import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -152,9 +154,12 @@ public class CmdTicketInfo extends FCommand {
         new BukkitRunnable() {
             private String getFile(Path file) {
                 try {
-                    return new String(Files.readAllBytes(file), StandardCharsets.UTF_8);
+                    return Files.readString(file);
                 } catch (IOException e) {
-                    return ExceptionUtils.getFullStackTrace(e);
+                    StringWriter stringWriter = new StringWriter();
+                    PrintWriter printWriter = new PrintWriter(stringWriter, true);
+                    e.printStackTrace(printWriter);
+                    return stringWriter.getBuffer().toString();
                 }
             }
 
@@ -187,7 +192,7 @@ public class CmdTicketInfo extends FCommand {
                     gzip.write(string.getBytes(StandardCharsets.UTF_8));
                     gzip.finish();
                     byte[] bytes = byteStream.toByteArray();
-                    URL url = new URL("https://ticket.plugin.party/ticket");
+                    URL url = new URI("https://ticket.plugin.party/ticket").toURL();
                     HttpURLConnection connection = (HttpURLConnection) url.openConnection();
                     connection.setConnectTimeout(3000);
                     connection.setReadTimeout(3000);

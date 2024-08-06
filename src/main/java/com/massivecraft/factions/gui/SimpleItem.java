@@ -1,7 +1,5 @@
 package com.massivecraft.factions.gui;
 
-import com.massivecraft.factions.FactionsPlugin;
-import org.bukkit.DyeColor;
 import org.bukkit.Material;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.inventory.ItemFlag;
@@ -20,21 +18,18 @@ public class SimpleItem {
     private String name;
     private List<String> lore;
     private Material material;
-    private DyeColor color;
     private boolean enchant;
 
     SimpleItem(Builder builder) {
         this.name = builder.name;
         this.lore = builder.lore;
         this.material = builder.material;
-        this.color = builder.color;
     }
 
     public SimpleItem(SimpleItem item) {
         this.name = item.name;
         this.lore = item.lore;
         this.material = item.material;
-        this.color = item.color;
         this.enchant = item.enchant;
     }
 
@@ -48,17 +43,9 @@ public class SimpleItem {
             }
             // Empty list if not specified
             meta.setLore(lore);
-            if (FactionsPlugin.getMCVersion() >= 800) {
-                meta.addItemFlags(ItemFlag.HIDE_ENCHANTS, ItemFlag.HIDE_ATTRIBUTES);
-            }
+            meta.addItemFlags(ItemFlag.HIDE_ENCHANTS, ItemFlag.HIDE_ATTRIBUTES);
             if (enchant) {
                 meta.addEnchant(Enchantment.LUCK, 1, true);
-            }
-
-            // If a user places a color, they should be expected to put a colorable object
-            if (color != null) {
-                // ItemStack.setData() does not work :(
-                itemStack.setDurability(color.getWoolData());
             }
 
             itemStack.setItemMeta(meta);
@@ -68,16 +55,13 @@ public class SimpleItem {
         }
     }
 
-    // All non null values in 'from' will be merged into this ItemGUI
+    // All non-null values in 'from' will be merged into this ItemGUI
     public void merge(SimpleItem from) {
         if (from.material != null) {
             material = from.material;
         }
         if (from.name != null) {
             name = from.name;
-        }
-        if (from.color != null) {
-            color = from.color;
         }
         if (!from.lore.isEmpty()) {
             lore = from.lore;
@@ -113,14 +97,6 @@ public class SimpleItem {
         this.material = material;
     }
 
-    public DyeColor getColor() {
-        return color;
-    }
-
-    public void setColor(DyeColor color) {
-        this.color = color;
-    }
-
     public boolean isEnchant() {
         return enchant;
     }
@@ -137,14 +113,8 @@ public class SimpleItem {
         private Material material;
         private String name;
         private List<String> lore;
-        private DyeColor color;
 
         private Builder() {
-        }
-
-        public Builder setColor(DyeColor color) {
-            this.color = color;
-            return this;
         }
 
         public Builder setLore(List<String> lore) {

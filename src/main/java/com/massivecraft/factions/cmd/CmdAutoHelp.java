@@ -19,10 +19,10 @@ public class CmdAutoHelp extends FCommand {
 
     @Override
     public void perform(CommandContext context) {
-        if (context.commandChain.size() == 0) {
+        if (context.commandChain.isEmpty()) {
             return;
         }
-        FCommand pcmd = context.commandChain.get(context.commandChain.size() - 1);
+        FCommand pcmd = context.commandChain.getLast();
 
         ArrayList<String> lines = new ArrayList<>(pcmd.helpLong);
 
@@ -33,7 +33,7 @@ public class CmdAutoHelp extends FCommand {
             // TODO deal with other visibilities
         }
 
-        context.sendMessage(FactionsPlugin.getInstance().txt().getPage(lines, context.argAsInt(0, 1), TL.COMMAND_AUTOHELP_HELPFOR.toString() + pcmd.aliases.get(0) + "\""));
+        context.sendMessage(FactionsPlugin.getInstance().txt().getPage(lines, context.argAsInt(0, 1), TL.COMMAND_AUTOHELP_HELPFOR + pcmd.aliases.getFirst() + "\""));
     }
 
     @Override

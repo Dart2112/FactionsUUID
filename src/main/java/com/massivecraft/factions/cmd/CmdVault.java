@@ -48,7 +48,7 @@ public class CmdVault extends FCommand {
         }
 
         // Something like faction-id
-        String vaultName = String.format(FactionsPlugin.getInstance().conf().playerVaults().getVaultPrefix(), context.faction.getId());
+        String vaultName = String.format(FactionsPlugin.getInstance().conf().playerVaults().getVaultPrefix(), "" + context.faction.getIntId());
 
         if (number < 1) {
             // Message about which vaults that Faction has.
@@ -78,7 +78,7 @@ public class CmdVault extends FCommand {
         return TL.COMMAND_VAULT_DESCRIPTION;
     }
 
-    protected class VaultBrigadier implements BrigadierProvider {
+    protected static class VaultBrigadier implements BrigadierProvider {
         @Override
         public ArgumentBuilder<Object, ?> get(ArgumentBuilder<Object, ?> parent) {
             return parent.then(RequiredArgumentBuilder.argument("number", IntegerArgumentType.integer(0, 99)));

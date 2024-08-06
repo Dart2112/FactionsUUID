@@ -1,7 +1,6 @@
 package com.massivecraft.factions.integration.dynmap;
 
 import com.massivecraft.factions.Board;
-import com.massivecraft.factions.FLocation;
 import com.massivecraft.factions.FPlayer;
 import com.massivecraft.factions.Faction;
 import com.massivecraft.factions.Factions;
@@ -13,9 +12,13 @@ import com.massivecraft.factions.perms.Role;
 import com.massivecraft.factions.tag.FactionTag;
 import com.massivecraft.factions.tag.GeneralTag;
 import com.massivecraft.factions.util.LazyLocation;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
+import it.unimi.dsi.fastutil.longs.LongList;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
+import org.bukkit.World;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.dynmap.DynmapAPI;
@@ -130,11 +133,11 @@ public class EngineDynmap {
 
 
             if (doIt) {
-                Map<String, Map<String, List<FLocation>>> worldFactionChunks = createWorldFactionChunks();
-                Map<String, String> factionTag = new HashMap<>();
-                Map<String, String> factionDesc = new HashMap<>();
-                Map<String, DynmapStyle> factionStyle = new HashMap<>();
-                worldFactionChunks.values().stream().flatMap(m -> m.keySet().stream()).distinct().forEach(factionId -> {
+                Map<String, Int2ObjectMap<LongList>> worldFactionChunks = createWorldFactionChunks();
+                Map<Integer, String> factionTag = new HashMap<>();
+                Map<Integer, String> factionDesc = new HashMap<>();
+                Map<Integer, DynmapStyle> factionStyle = new HashMap<>();
+                worldFactionChunks.values().stream().flatMapToInt(m -> m.keySet().intStream()).distinct().forEach(factionId -> {
                     Faction faction = Factions.getInstance().getFactionById(factionId);
                     factionTag.put(factionId, faction.getTag());
                     factionDesc.put(factionId, getDescription(faction));
@@ -229,7 +232,7 @@ public class EngineDynmap {
 
             DynmapStyle style = getStyle(faction);
 
-            String markerId = FACTIONS_HOME_ + faction.getId();
+            String markerId = FACTIONS_HOME_ + faction.getIntId();
 
             TempMarker temp = new TempMarker();
             temp.label = ChatColor.stripColor(faction.getTag());
@@ -301,7 +304,7 @@ public class EngineDynmap {
 
                 DynmapStyle style = getStyle(faction);
 
-                String markerId = FACTIONS_WARP_ + faction.getId() + "_" + key;
+                String markerId = FACTIONS_WARP_ + faction.getIntId() + "_" + key;
 
                 TempMarker temp = new TempMarker();
                 temp.label = ChatColor.stripColor(faction.getTag());
@@ -323,43 +326,37 @@ public class EngineDynmap {
     // UPDATE: AREAS
     // -------------------------------------------- //
 
-    // Thread Safe: YES
-    public Map<String, Map<String, List<FLocation>>> createWorldFactionChunks() {
+    // Thread Safe: NO
+    public Map<String, Int2ObjectMap<LongList>> createWorldFactionChunks() {
         // Create map "world name --> faction --> set of chunk coords"
-        Map<String, Map<String, List<FLocation>>> worldFactionChunks = new HashMap<>();
+        Map<String, Int2ObjectMap<LongList>> worldFactionChunks = new HashMap<>();
 
         // Note: The board is the world. The board id is the world name.
         MemoryBoard board = (MemoryBoard) Board.getInstance();
 
-        for (Entry<FLocation, String> entry : board.flocationIds.entrySet()) {
-            String world = entry.getKey().getWorldName();
-
-            Map<String, List<FLocation>> factionChunks = worldFactionChunks.computeIfAbsent(world, k -> new HashMap<>());
-
-            List<FLocation> factionTerritory = factionChunks.computeIfAbsent(entry.getValue(), k -> new ArrayList<>());
-
-            factionTerritory.add(entry.getKey());
+        for (World world : Bukkit.getWorlds()) {
+            worldFactionChunks.put(world.getName(), board.getAllClaimsForDynmap(world));
         }
 
         return worldFactionChunks;
     }
 
     // Thread Safe: YES
-    public Map<String, TempAreaMarker> createAreas(Map<String, Map<String, List<FLocation>>> worldFactionChunks, Map<String, String> factionTag, Map<String, String> factionDesc, Map<String, DynmapStyle> factionStyle) {
+    public Map<String, TempAreaMarker> createAreas(Map<String, Int2ObjectMap<LongList>> worldFactionChunks, Map<Integer, String> factionTag, Map<Integer, String> factionDesc, Map<Integer, DynmapStyle> factionStyle) {
         Map<String, TempAreaMarker> ret = new HashMap<>();
 
         // For each world
-        for (Entry<String, Map<String, List<FLocation>>> entry : worldFactionChunks.entrySet()) {
+        for (Entry<String, Int2ObjectMap<LongList>> entry : worldFactionChunks.entrySet()) {
             String world = entry.getKey();
-            Map<String, List<FLocation>> factionChunks = entry.getValue();
+            Int2ObjectMap<LongList> factionChunks = entry.getValue();
 
             // For each faction and its chunks in that world
-            for (Entry<String, List<FLocation>> entry1 : factionChunks.entrySet()) {
-                String factionId = entry1.getKey();
-                List<FLocation> chunks = entry1.getValue();
+            factionChunks.int2ObjectEntrySet().forEach(e-> {
+                int factionId = e.getIntKey();
+                LongList chunks = e.getValue();
                 Map<String, TempAreaMarker> worldFactionMarkers = createAreas(world, factionId, chunks, factionTag, factionDesc, factionStyle);
                 ret.putAll(worldFactionMarkers);
-            }
+            });
         }
 
         return ret;
@@ -368,7 +365,7 @@ public class EngineDynmap {
     // Thread Safe: YES
     // Handle specific faction on specific world
     // "handle faction on world"
-    public Map<String, TempAreaMarker> createAreas(String world, String factionId, List<FLocation> chunks, Map<String, String> factionTag, Map<String, String> factionDesc, Map<String, DynmapStyle> factionStyle) {
+    public Map<String, TempAreaMarker> createAreas(String world, int factionId, LongList chunks, Map<Integer, String> factionTag, Map<Integer, String> factionDesc, Map<Integer, DynmapStyle> factionStyle) {
         Map<String, TempAreaMarker> ret = new HashMap<>();
 
         // If the faction is visible ...
@@ -392,22 +389,22 @@ public class EngineDynmap {
 
         // Loop through chunks: set flags on chunk map
         TileFlags allChunkFlags = new TileFlags();
-        ArrayList<FLocation> allChunks = new ArrayList<>(chunks.size());
-        for (FLocation chunk : chunks) {
-            allChunkFlags.setFlag((int) chunk.getX(), (int) chunk.getZ(), true); // Set flag for chunk
+        LongList allChunks = new LongArrayList(chunks.size());
+        for (long chunk : chunks) {
+            allChunkFlags.setFlag(MemoryBoard.Morton.getX(chunk), MemoryBoard.Morton.getZ(chunk), true); // Set flag for chunk
             allChunks.add(chunk);
         }
 
         // Loop through until we don't find more areas
         while (allChunks != null) {
             TileFlags ourChunkFlags = null;
-            ArrayList<FLocation> newChunks = null;
+            LongList newChunks = null;
 
             int minimumX = Integer.MAX_VALUE;
             int minimumZ = Integer.MAX_VALUE;
-            for (FLocation chunk : allChunks) {
-                int chunkX = (int) chunk.getX();
-                int chunkZ = (int) chunk.getZ();
+            for (long chunk : allChunks) {
+                int chunkX = MemoryBoard.Morton.getX(chunk);
+                int chunkZ = MemoryBoard.Morton.getZ(chunk);
 
                 // If we need to start shape, and this block is not part of one yet
                 if (ourChunkFlags == null && allChunkFlags.getFlag(chunkX, chunkZ)) {
@@ -428,7 +425,7 @@ public class EngineDynmap {
                 // Else, keep it in the list for the next polygon
                 else {
                     if (newChunks == null) {
-                        newChunks = new ArrayList<>();
+                        newChunks = new LongArrayList();
                     }
                     newChunks.add(chunk);
                 }
@@ -587,11 +584,7 @@ public class EngineDynmap {
         if (faction.isWilderness()) {
             return null;
         }
-        String factionId = faction.getId();
-        if (factionId == null) {
-            return null;
-        }
-        return FACTIONS_PLAYERSET_ + factionId;
+        return FACTIONS_PLAYERSET_ + faction.getIntId();
     }
 
     // Thread Safe / Asynchronous: Yes
@@ -773,7 +766,7 @@ public class EngineDynmap {
     public static String getHtmlPlayerString(Collection<FPlayer> playersOfficersList) {
         StringBuilder ret = new StringBuilder();
         for (FPlayer fplayer : playersOfficersList) {
-            if (ret.length() > 0) {
+            if (!ret.isEmpty()) {
                 ret.append(", ");
             }
             ret.append(getHtmlPlayerName(fplayer));
@@ -807,22 +800,22 @@ public class EngineDynmap {
     }
 
     // Thread Safe / Asynchronous: Yes
-    private boolean isVisible(String factionId, String factionTag, String world) {
+    private boolean isVisible(int factionId, String factionTag, String world) {
         Set<String> visible = dynmapConf.dynmap().getVisibleFactions();
         Set<String> hidden = dynmapConf.dynmap().getHiddenFactions();
 
-        if (!visible.isEmpty() && !visible.contains(factionId) && !visible.contains(factionTag) && !visible.contains("world:" + world)) {
+        if (!visible.isEmpty() && !visible.contains(String.valueOf(factionId)) && !visible.contains(factionTag) && !visible.contains("world:" + world)) {
             return false;
         }
 
-        return !hidden.contains(factionId) && !hidden.contains(factionTag) && !hidden.contains("world:" + world);
+        return !hidden.contains(String.valueOf(factionId)) && !hidden.contains(factionTag) && !hidden.contains("world:" + world);
     }
 
     // Thread Safe / Asynchronous: Yes
     public DynmapStyle getStyle(Faction faction) {
         DynmapStyle ret;
 
-        ret = dynmapConf.dynmap().getFactionStyles().get(faction.getId());
+        ret = dynmapConf.dynmap().getFactionStyles().get(String.valueOf(faction.getIntId()));
         if (ret != null) {
             return ret;
         }
@@ -837,7 +830,7 @@ public class EngineDynmap {
 
     // Thread Safe / Asynchronous: Yes
     static void severe(String msg) {
-        String message = DYNMAP_INTEGRATION + ChatColor.RED.toString() + msg;
+        String message = DYNMAP_INTEGRATION + ChatColor.RED + msg;
         FactionsPlugin.getInstance().getLogger().severe(message);
     }
 

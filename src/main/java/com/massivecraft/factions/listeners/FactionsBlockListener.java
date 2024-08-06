@@ -21,10 +21,10 @@ import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
-import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockDamageEvent;
 import org.bukkit.event.block.BlockDispenseEvent;
+import org.bukkit.event.block.BlockExplodeEvent;
 import org.bukkit.event.block.BlockFormEvent;
 import org.bukkit.event.block.BlockFromToEvent;
 import org.bukkit.event.block.BlockPistonExtendEvent;
@@ -33,11 +33,9 @@ import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.block.EntityBlockFormEvent;
 import org.bukkit.inventory.ItemStack;
 
-import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
 
-public class FactionsBlockListener implements Listener {
+public class FactionsBlockListener extends AbstractListener {
 
     public final FactionsPlugin plugin;
 
@@ -202,6 +200,11 @@ public class FactionsBlockListener implements Listener {
     }
 
     @EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = true)
+    public void onBlockExplode(BlockExplodeEvent event) {
+        this.handleExplosion(event.getBlock().getLocation(), null, event, event.blockList());
+    }
+
+    @EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = true)
     public void onBlockPistonExtend(BlockPistonExtendEvent event) {
         if (!plugin.worldUtil().isEnabled(event.getBlock().getWorld())) {
             return;
@@ -234,12 +237,7 @@ public class FactionsBlockListener implements Listener {
             return;
         }
 
-        List<Block> blocks;
-        if (FactionsPlugin.getMCVersion() < 800) {
-            blocks = Collections.singletonList(event.getBlock().getRelative(event.getDirection(), 2));
-        } else {
-            blocks = event.getBlocks();
-        }
+        List<Block> blocks = event.getBlocks();
 
         // if the retracted blocks list is empty, no worries
         if (blocks.isEmpty()) {
@@ -254,12 +252,12 @@ public class FactionsBlockListener implements Listener {
     }
 
     private boolean canPistonMoveBlock(Faction pistonFaction, List<Block> blocks, BlockFace direction) {
-        String world = blocks.get(0).getWorld().getName();
+        String world = blocks.getFirst().getWorld().getName();
         List<FLocation> locations = (direction == null ? blocks.stream() : blocks.stream().map(b -> b.getRelative(direction)))
                 .map(Block::getLocation)
                 .map(FLocation::new)
                 .distinct()
-                .collect(Collectors.toList());
+                .toList();
 
         boolean disableOverall = FactionsPlugin.getInstance().conf().factions().other().isDisablePistonsInTerritory();
         for (FLocation location : locations) {

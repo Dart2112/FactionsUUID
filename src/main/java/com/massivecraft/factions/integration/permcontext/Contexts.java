@@ -21,7 +21,7 @@ import java.util.stream.Collectors;
 public enum Contexts implements Context {
     FACTION_ID((player) -> {
         FPlayer p = FPlayers.getInstance().getByPlayer(player);
-        return ImmutableSet.of(p.hasFaction() ? p.getFaction().getId() : "0");
+        return ImmutableSet.of(p.hasFaction() ? String.valueOf(p.getFactionIntId()) : "0");
     }, ImmutableSet.of("0")),
     IS_PEACEFUL((player) -> {
         FPlayer p = FPlayers.getInstance().getByPlayer(player);
@@ -55,13 +55,11 @@ public enum Contexts implements Context {
 
     private final Function<Player, Set<String>> function;
     private final String name;
-    private final String namespacedName;
     private final Set<String> possibilities;
 
     Contexts(Function<Player, Set<String>> function, Set<String> possibilities) {
         this.function = function;
         this.name = this.name().toLowerCase().replace('_', '-');
-        this.namespacedName = FACTIONSUUID_NAMESPACE + ':' + this.name;
         this.possibilities = Collections.unmodifiableSet(possibilities);
     }
 
@@ -73,11 +71,6 @@ public enum Contexts implements Context {
     @Override
     public String getNamespace() {
         return FACTIONSUUID_NAMESPACE;
-    }
-
-    @Override
-    public String getNamespacedName() {
-        return this.namespacedName;
     }
 
     @Override

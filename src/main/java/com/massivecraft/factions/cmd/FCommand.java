@@ -8,7 +8,6 @@ import com.massivecraft.factions.util.TL;
 import com.massivecraft.factions.util.TextUtil;
 import org.bukkit.ChatColor;
 
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -54,10 +53,10 @@ public abstract class FCommand {
 
     public void execute(CommandContext context) {
         // Is there a matching sub command?
-        if (context.args.size() > 0) {
+        if (!context.args.isEmpty()) {
             for (FCommand subCommand : this.subCommands) {
-                if (subCommand.aliases.contains(context.args.get(0).toLowerCase())) {
-                    context.args.remove(0);
+                if (subCommand.aliases.contains(context.args.getFirst().toLowerCase())) {
+                    context.args.removeFirst();
                     context.commandChain.add(this);
                     subCommand.execute(context);
                     return;
@@ -193,7 +192,7 @@ public abstract class FCommand {
             args.add("[" + optionalArg.getKey() + val + "]");
         }
 
-        if (args.size() > 0) {
+        if (!args.isEmpty()) {
             ret.append(FactionsPlugin.getInstance().txt().parseTags("<p> "));
             ret.append(TextUtil.implode(args, " "));
         }

@@ -47,7 +47,10 @@ public interface Faction extends EconomyParticipator, Selectable {
 
     Set<String> getInvites();
 
+    @Deprecated
     String getId();
+
+    int getIntId();
 
     void invite(FPlayer fplayer);
 
@@ -294,6 +297,4 @@ public interface Faction extends EconomyParticipator, Selectable {
     void remove();
 
     Set<FLocation> getAllClaims();
-
-    void setId(String id);
 }

@@ -12,11 +12,6 @@ public class ConfigTest {
         testConfig(new MainConfig());
     }
 
-    @Test
-    public void testPerms() {
-        testConfig(new PermissionsConfig());
-    }
-
     private void testConfig(Object o) {
         try {
             assertNotNull(o, o.getClass());
@@ -26,7 +21,6 @@ public class ConfigTest {
     }
 
     private void assertNotNull(Object o, Class<?> clazz) throws IllegalAccessException {
-        System.out.println(clazz);
         for (Field field : clazz.getDeclaredFields()) {
             if (field.isSynthetic() || Modifier.isTransient(field.getModifiers())) {
                 continue;

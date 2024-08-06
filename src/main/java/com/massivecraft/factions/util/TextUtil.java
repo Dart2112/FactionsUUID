@@ -1,11 +1,9 @@
 package com.massivecraft.factions.util;
 
-import com.massivecraft.factions.lib.mkremins.fanciful.FancyMessage;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextColor;
 import net.kyori.adventure.text.minimessage.MiniMessage;
-import net.kyori.adventure.text.serializer.gson.GsonComponentSerializer;
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer;
 import org.bukkit.ChatColor;
 import org.bukkit.Material;
@@ -46,41 +44,24 @@ public class TextUtil {
         } else {
             namedTextColor = NamedTextColor.nearestTo(color);
         }
-        switch (namedTextColor.toString()) {
-            case "black":
-                return ChatColor.BLACK;
-            case "dark_blue":
-                return ChatColor.DARK_BLUE;
-            case "dark_green":
-                return ChatColor.DARK_GREEN;
-            case "dark_aqua":
-                return ChatColor.DARK_AQUA;
-            case "dark_red":
-                return ChatColor.DARK_RED;
-            case "dark_purple":
-                return ChatColor.DARK_PURPLE;
-            case "gold":
-                return ChatColor.GOLD;
-            case "gray":
-                return ChatColor.GRAY;
-            case "dark_gray":
-                return ChatColor.DARK_GRAY;
-            case "blue":
-                return ChatColor.BLUE;
-            case "green":
-                return ChatColor.GREEN;
-            case "aqua":
-                return ChatColor.AQUA;
-            case "red":
-                return ChatColor.RED;
-            case "light_purple":
-                return ChatColor.LIGHT_PURPLE;
-            case "yellow":
-                return ChatColor.YELLOW;
-            case "white":
-            default:
-                return ChatColor.WHITE;
-        }
+        return switch (namedTextColor.toString()) {
+            case "black" -> ChatColor.BLACK;
+            case "dark_blue" -> ChatColor.DARK_BLUE;
+            case "dark_green" -> ChatColor.DARK_GREEN;
+            case "dark_aqua" -> ChatColor.DARK_AQUA;
+            case "dark_red" -> ChatColor.DARK_RED;
+            case "dark_purple" -> ChatColor.DARK_PURPLE;
+            case "gold" -> ChatColor.GOLD;
+            case "gray" -> ChatColor.GRAY;
+            case "dark_gray" -> ChatColor.DARK_GRAY;
+            case "blue" -> ChatColor.BLUE;
+            case "green" -> ChatColor.GREEN;
+            case "aqua" -> ChatColor.AQUA;
+            case "red" -> ChatColor.RED;
+            case "light_purple" -> ChatColor.LIGHT_PURPLE;
+            case "yellow" -> ChatColor.YELLOW;
+            default -> ChatColor.WHITE;
+        };
     }
 
     // -------------------------------------------- //
@@ -106,7 +87,7 @@ public class TextUtil {
     public static final transient Pattern patternTag = Pattern.compile("<([a-zA-Z0-9_]*)>");
 
     public static String replaceTags(String str, Map<String, String> tags) {
-        StringBuffer ret = new StringBuffer();
+        StringBuilder ret = new StringBuilder();
         Matcher matcher = patternTag.matcher(str);
         while (matcher.find()) {
             String tag = matcher.group(1);
@@ -119,18 +100,6 @@ public class TextUtil {
         }
         matcher.appendTail(ret);
         return ret.toString();
-    }
-
-    // -------------------------------------------- //
-    // Fancy parsing
-    // -------------------------------------------- //
-
-    public FancyMessage parseFancy(String prefix) {
-        return toFancy(parse(prefix));
-    }
-
-    public static FancyMessage toFancy(String first) {
-        return FancyMessage.deserialize(GsonComponentSerializer.gson().serialize(LegacyComponentSerializer.legacySection().deserialize(first)));
     }
 
     // -------------------------------------------- //

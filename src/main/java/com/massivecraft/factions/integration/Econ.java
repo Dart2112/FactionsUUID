@@ -2,6 +2,7 @@ package com.massivecraft.factions.integration;
 
 import com.massivecraft.factions.FPlayer;
 import com.massivecraft.factions.Faction;
+import com.massivecraft.factions.Factions;
 import com.massivecraft.factions.FactionsPlugin;
 import com.massivecraft.factions.iface.EconomyParticipator;
 import com.massivecraft.factions.perms.Role;
@@ -92,14 +93,14 @@ public class Econ {
         if (FactionsPlugin.getInstance().conf().economy().getUniverseAccount() == null) {
             return;
         }
-        if (FactionsPlugin.getInstance().conf().economy().getUniverseAccount().length() == 0) {
+        if (FactionsPlugin.getInstance().conf().economy().getUniverseAccount().isEmpty()) {
             return;
         }
-        if (!hasAccount(FactionsPlugin.getInstance().conf().economy().getUniverseAccount())) {
+        if (!hasAccount(getOfflinePlayerForName(FactionsPlugin.getInstance().conf().economy().getUniverseAccount()))) {
             return;
         }
 
-        modifyBalance(FactionsPlugin.getInstance().conf().economy().getUniverseAccount(), delta);
+        modifyBalance(getOfflinePlayerForName(FactionsPlugin.getInstance().conf().economy().getUniverseAccount()), delta);
     }
 
     public static void sendBalanceInfo(FPlayer to, EconomyParticipator about) {
@@ -197,7 +198,7 @@ public class Econ {
         }
 
         // Check if the new balance is over Essential's money cap.
-        if (FactionsPlugin.getInstance().getIntegrationManager().isEnabled(IntegrationManager.Integration.ESS) && Essentials.isOverBalCap(to, getBalance(toAcc) + amount)) {
+        if (FactionsPlugin.getInstance().getIntegrationManager().isEnabled(IntegrationManager.Integration.ESS) && Essentials.isOverBalCap(getBalance(toAcc) + amount)) {
             invoker.msg(TL.ECON_OVER_BAL_CAP, amount);
             return false;
         }
@@ -379,7 +380,7 @@ public class Econ {
         try {
             Matcher matcher = FACTION_PATTERN.matcher(name);
             if (matcher.find()) {
-                return com.massivecraft.factions.Factions.getInstance().getFactionById(matcher.group(1)).getOfflinePlayer();
+                return Factions.getInstance().getFactionById(Integer.parseInt(matcher.group(1))).getOfflinePlayer();
             }
             return Bukkit.getOfflinePlayer(UUID.fromString(name));
         } catch (Exception ex) {
@@ -529,7 +530,6 @@ public class Econ {
         return op;
     }
 
-    @SuppressWarnings("ResultOfMethodCallIgnored")
     @Deprecated
     public static boolean isUUID(String uuid) {
         try {

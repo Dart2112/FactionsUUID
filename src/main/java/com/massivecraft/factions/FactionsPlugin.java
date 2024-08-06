@@ -16,13 +16,11 @@ import com.massivecraft.factions.event.FactionsPluginRegistrationTimeEvent;
 import com.massivecraft.factions.integration.ClipPlaceholderAPIManager;
 import com.massivecraft.factions.integration.Econ;
 import com.massivecraft.factions.integration.Essentials;
-import com.massivecraft.factions.integration.IWorldguard;
 import com.massivecraft.factions.integration.IntegrationManager;
 import com.massivecraft.factions.integration.LWC;
 import com.massivecraft.factions.integration.LuckPerms;
 import com.massivecraft.factions.integration.VaultPerms;
-import com.massivecraft.factions.integration.Worldguard6;
-import com.massivecraft.factions.integration.Worldguard7;
+import com.massivecraft.factions.integration.Worldguard;
 import com.massivecraft.factions.integration.dynmap.EngineDynmap;
 import com.massivecraft.factions.integration.permcontext.ContextManager;
 import com.massivecraft.factions.landraidcontrol.LandRaidControl;
@@ -31,10 +29,6 @@ import com.massivecraft.factions.listeners.FactionsChatListener;
 import com.massivecraft.factions.listeners.FactionsEntityListener;
 import com.massivecraft.factions.listeners.FactionsExploitListener;
 import com.massivecraft.factions.listeners.FactionsPlayerListener;
-import com.massivecraft.factions.listeners.OneEightPlusListener;
-import com.massivecraft.factions.listeners.OneFourteenPlusListener;
-import com.massivecraft.factions.listeners.versionspecific.PortalHandler;
-import com.massivecraft.factions.listeners.versionspecific.PortalListenerLegacy;
 import com.massivecraft.factions.listeners.versionspecific.PortalListener_114;
 import com.massivecraft.factions.perms.PermSelector;
 import com.massivecraft.factions.perms.PermSelectorRegistry;
@@ -53,12 +47,9 @@ import com.massivecraft.factions.util.Persist;
 import com.massivecraft.factions.util.SeeChunkUtil;
 import com.massivecraft.factions.util.TL;
 import com.massivecraft.factions.util.TextUtil;
-import com.massivecraft.factions.util.TitleAPI;
 import com.massivecraft.factions.util.WorldUtil;
 import com.massivecraft.factions.util.material.MaterialDb;
 import com.massivecraft.factions.util.particle.BukkitParticleProvider;
-import com.massivecraft.factions.util.particle.PacketParticleProvider;
-import com.massivecraft.factions.util.particle.ParticleProvider;
 import com.mojang.authlib.GameProfile;
 import io.papermc.lib.PaperLib;
 import net.kyori.adventure.audience.Audience;
@@ -93,10 +84,10 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Type;
 import java.net.HttpURLConnection;
+import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -124,6 +115,8 @@ public class FactionsPlugin extends JavaPlugin implements FactionsAPI {
     // Single 4 life.
     private static FactionsPlugin instance;
     private static int mcVersion;
+    private static final int OLDEST_MODERN_SUPPORTED = 2004; // 1.20.4
+    private static final String OLDEST_MODERN_SUPPORTED_STRING = "1.20.4";
 
     public static FactionsPlugin getInstance() {
         return instance;
@@ -177,8 +170,8 @@ public class FactionsPlugin extends JavaPlugin implements FactionsAPI {
     private final Set<String> pluginsHandlingChat = Collections.newSetFromMap(new ConcurrentHashMap<>());
 
     private SeeChunkUtil seeChunkUtil;
-    private ParticleProvider<?> particleProvider;
-    private IWorldguard worldguard;
+    private BukkitParticleProvider particleProvider;
+    private Worldguard worldguard;
     private LandRaidControl landRaidControl;
     private boolean luckPermsSetup;
     private IntegrationManager integrationManager;
@@ -192,7 +185,6 @@ public class FactionsPlugin extends JavaPlugin implements FactionsAPI {
     private final List<RuntimeException> grumpyExceptions = new ArrayList<>();
     private VaultPerms vaultPerms;
     public final boolean likesCats = Arrays.stream(FactionsPlugin.class.getDeclaredMethods()).anyMatch(m -> m.isSynthetic() && m.getName().startsWith("loadCon") && m.getName().endsWith("0"));
-    private boolean gottaSlapEssentials;
     private Method getOffline;
     private BukkitAudiences adventure;
     private String mcVersionString;
@@ -207,99 +199,11 @@ public class FactionsPlugin extends JavaPlugin implements FactionsAPI {
     @Override
     public void onLoad() {
         IntegrationManager.onLoad(this);
-        this.tryEssXMigrationOnLoad();
         try {
             Class.forName("com.sk89q.worldguard.WorldGuard");
-            Worldguard7.onLoad();
+            Worldguard.onLoad();
         } catch (Exception ignored) {
             // eh
-        }
-        try {
-            Class.forName("com.sk89q.worldguard.bukkit.WGBukkit");
-            Class.forName("com.sk89q.worldguard.protection.flags.registry.FlagConflictException");
-            Worldguard6.onLoad(this.getLogger(), () -> this.conf().worldGuard().isChecking());
-        } catch (Exception ignoredAgain) {
-            // eh
-        }
-    }
-
-    private void tryEssXMigrationOnLoad() {
-        try {
-            Class.forName("com.earth2me.essentials.economy.vault.VaultEconomyProvider");
-            Path dataFolder = this.getDataFolder().toPath().resolve("data");
-            Path essDataFolder = this.getDataFolder().toPath().getParent().resolve("Essentials").resolve("userdata");
-            Path essUserMap = this.getDataFolder().toPath().getParent().resolve("Essentials").resolve("usermap.csv");
-            if (!Files.exists(dataFolder) || !Files.isDirectory(dataFolder) || !Files.exists(essDataFolder) || !Files.isDirectory(essDataFolder)) {
-                return;
-            }
-            Path conversionCompleteFile = dataFolder.resolve("modernEssXAccountsComplete.txt");
-            if (Files.exists(conversionCompleteFile)) {
-                return; // My work here is done.
-            }
-
-            Map<String, Object> data = new Gson().fromJson(new String(Files.readAllBytes(dataFolder.resolve("factions.json"))), new TypeToken<Map<String, Object>>() {
-            }.getType());
-
-            if (data == null || data.isEmpty()) {
-                Files.write(conversionCompleteFile, "Do not delete unless you want to waste time at startup!".getBytes(StandardCharsets.UTF_8));
-                return;
-            }
-
-            this.getLogger().info("");
-            this.getLogger().info("     We interrupt this server startup for an important message");
-            this.getLogger().info("");
-            this.getLogger().info("  FactionsUUID has identified a version of EssentialsX that has");
-            this.getLogger().info("  fixed Vault integration. However, there may be older pre-EssX-fix");
-            this.getLogger().info("  bank data present, so this plugin will attempt to move any such");
-            this.getLogger().info("  accounts in a one-time event");
-            this.getLogger().info("");
-
-            int count = 0;
-            for (String faction : data.keySet()) {
-                String name = UUID.nameUUIDFromBytes(("NPC:" + "faction_" + faction).getBytes(Charsets.UTF_8)) + ".yml";
-                String newName = UUID.nameUUIDFromBytes(("OfflinePlayer:" + "faction-" + faction).getBytes(Charsets.UTF_8)) + ".yml";
-                Path oldFile = essDataFolder.resolve(name);
-                Path newFile = essDataFolder.resolve(newName);
-                Path oldNewFile = essDataFolder.resolve(newName + ".bak");
-                this.getLogger().info("Testing for " + "faction-" + faction + " (" + name + ")");
-                if (Files.exists(oldFile)) {
-                    try {
-                        if (Files.exists(newFile)) {
-                            Files.move(newFile, oldNewFile);
-                        }
-                        Files.move(oldFile, newFile);
-                        this.getLogger().info("Moved faction " + faction + " from " + name + " to " + newName);
-                    } catch (IOException e) {
-                        this.getLogger().warning("Failed to migrate faction " + faction + " file " + oldFile + ": " + e.getMessage());
-                    }
-                    count++;
-                }
-            }
-
-            if (count > 0) {
-                this.gottaSlapEssentials = true;
-                try {
-                    Files.delete(essUserMap);
-                } catch (IOException e) {
-                    this.getLogger().warning("Failed to migrate delete usermap.csv, which may cause issues: " + e.getMessage());
-                }
-            }
-
-            this.getLogger().info("Done!");
-            this.getLogger().info("");
-            if (count == 0) {
-                this.getLogger().info("Found no data to migrate!");
-            } else {
-                this.getLogger().info("Migrated " + count + " files!");
-            }
-
-            Files.write(conversionCompleteFile, "Do not delete unless you want to waste time at startup!".getBytes(StandardCharsets.UTF_8));
-
-            this.getLogger().info("  We did it! Yay!");
-        } catch (ClassNotFoundException | NoClassDefFoundError e) {
-            // Good.
-        } catch (Exception e) {
-            this.getLogger().log(Level.SEVERE, "Failed to migrate EssX accounts", e);
         }
     }
 
@@ -321,7 +225,7 @@ public class FactionsPlugin extends JavaPlugin implements FactionsAPI {
                     PrintWriter printWriter = new PrintWriter(stringWriter);
                     record.getThrown().printStackTrace(printWriter);
                     startupExceptionBuilder.append('[').append(record.getLevel().getName()).append("] ").append(record.getMessage()).append('\n')
-                            .append(stringWriter.toString()).append('\n');
+                            .append(stringWriter).append('\n');
                 }
             }
 
@@ -369,6 +273,7 @@ public class FactionsPlugin extends JavaPlugin implements FactionsAPI {
         // Version party
         Pattern versionPattern = Pattern.compile("1\\.(\\d{1,2})(?:\\.(\\d{1,2}))?");
         Matcher versionMatcher = versionPattern.matcher(this.getServer().getVersion());
+
         getLogger().info("");
         getLogger().info("Factions UUID!");
         getLogger().info("Version " + this.getDescription().getVersion());
@@ -389,16 +294,16 @@ public class FactionsPlugin extends JavaPlugin implements FactionsAPI {
         }
         if (versionInteger == null) {
             getLogger().warning("");
-            getLogger().warning("Could not identify version. Going with least supported version, 1.7.10.");
+            getLogger().warning("Could not identify version. Going with least supported version, " + OLDEST_MODERN_SUPPORTED_STRING + ".");
             getLogger().warning("Please visit our support live chat for help - https://factions.support/help/");
             getLogger().warning("");
-            versionInteger = 710;
+            versionInteger = OLDEST_MODERN_SUPPORTED;
             this.mcVersionString = this.getServer().getVersion();
         }
         mcVersion = versionInteger;
-        if (mcVersion < 808) {
+        if (mcVersion < OLDEST_MODERN_SUPPORTED) {
             getLogger().info("");
-            getLogger().warning("FactionsUUID works better with at least Minecraft 1.8.8");
+            getLogger().warning("FactionsUUID expects at least " + OLDEST_MODERN_SUPPORTED_STRING + " and may not work on your version.");
         }
         getLogger().info("");
         this.buildNumber = this.getBuildNumber(this.getDescription().getVersion());
@@ -455,9 +360,9 @@ public class FactionsPlugin extends JavaPlugin implements FactionsAPI {
         int loadedPlayers = FPlayers.getInstance().load();
         int loadedFactions = Factions.getInstance().load();
         for (FPlayer fPlayer : FPlayers.getInstance().getAllFPlayers()) {
-            Faction faction = Factions.getInstance().getFactionById(fPlayer.getFactionId());
+            Faction faction = Factions.getInstance().getFactionById(fPlayer.getFactionIntId());
             if (faction == null) {
-                log("Invalid faction id on " + fPlayer.getName() + ":" + fPlayer.getFactionId());
+                log("Invalid faction id on " + fPlayer.getName() + ":" + fPlayer.getFactionIntId());
                 fPlayer.resetFactionData(false);
                 continue;
             }
@@ -472,11 +377,9 @@ public class FactionsPlugin extends JavaPlugin implements FactionsAPI {
 
         ContextManager.init(this);
         if (getServer().getPluginManager().getPlugin("PermissionsEx") != null) {
-            if (getServer().getPluginManager().getPlugin("PermissionsEx").getDescription().getVersion().startsWith("1")) {
-                getLogger().info(" ");
-                getLogger().warning("Notice: PermissionsEx version 1.x is dead. We suggest using LuckPerms (or PEX 2.0 when available). https://luckperms.net/");
-                getLogger().info(" ");
-            }
+            getLogger().info(" ");
+            getLogger().warning("Notice: PermissionsEx dead. We suggest using LuckPerms. https://luckperms.net/");
+            getLogger().info(" ");
         }
         if (getServer().getPluginManager().getPlugin("GroupManager") != null) {
             getLogger().info(" ");
@@ -494,12 +397,7 @@ public class FactionsPlugin extends JavaPlugin implements FactionsAPI {
         startAutoLeaveTask(false);
 
         // Run before initializing listeners to handle reloads properly.
-        if (mcVersion < 1300) { // Before 1.13
-            particleProvider = new PacketParticleProvider();
-        } else {
-            particleProvider = new BukkitParticleProvider();
-        }
-        getLogger().info(txt.parse("Using %1s as a particle provider", particleProvider.name()));
+        particleProvider = new BukkitParticleProvider();
 
         if (conf().commands().seeChunk().isParticles()) {
             double delay = Math.floor(conf().commands().seeChunk().getParticleUpdateTime() * 20);
@@ -514,19 +412,7 @@ public class FactionsPlugin extends JavaPlugin implements FactionsAPI {
         getServer().getPluginManager().registerEvents(new FactionsEntityListener(this), this);
         getServer().getPluginManager().registerEvents(new FactionsExploitListener(this), this);
         getServer().getPluginManager().registerEvents(new FactionsBlockListener(this), this);
-        if (mcVersion >= 800) {
-            getServer().getPluginManager().registerEvents(new OneEightPlusListener(this), this);
-        }
-        if (mcVersion >= 1400) {
-            getServer().getPluginManager().registerEvents(new OneFourteenPlusListener(this), this);
-        }
-
-        // Version specific portal listener check.
-        if (mcVersion >= 1400) { // Starting with 1.14
-            getServer().getPluginManager().registerEvents(new PortalListener_114(this), this);
-        } else {
-            getServer().getPluginManager().registerEvents(new PortalListenerLegacy(new PortalHandler()), this);
-        }
+        getServer().getPluginManager().registerEvents(new PortalListener_114(this), this);
 
         // since some other plugins execute commands directly through this command interface, provide it
         this.getCommand(refCommand).setExecutor(cmdBase);
@@ -534,8 +420,6 @@ public class FactionsPlugin extends JavaPlugin implements FactionsAPI {
         if (conf().commands().fly().isEnable()) {
             FlightUtil.start();
         }
-
-        new TitleAPI();
 
         try {
             this.getOffline = this.getServer().getClass().getDeclaredMethod("getOfflinePlayer", GameProfile.class);
@@ -565,9 +449,6 @@ public class FactionsPlugin extends JavaPlugin implements FactionsAPI {
                 } catch (Exception e) {
                     getLogger().log(Level.SEVERE, "Failed to close registries", e);
                 }
-                if (FactionsPlugin.this.gottaSlapEssentials) {
-                    FactionsPlugin.this.getServer().dispatchCommand(FactionsPlugin.this.getServer().getConsoleSender(), "baltop force");
-                }
 
                 Econ.setup();
                 vaultPerms = new VaultPerms();
@@ -580,7 +461,7 @@ public class FactionsPlugin extends JavaPlugin implements FactionsAPI {
             }
         }.runTask(this);
 
-        getLogger().info("=== Ready to go after " + (System.currentTimeMillis() - timeEnableStart) + "ms! ===");
+        getLogger().info("=== Initial start took " + (System.currentTimeMillis() - timeEnableStart) + "ms! ===");
         this.loadSuccessful = true;
 
         this.updateCheck = new Gson().toJson(update);
@@ -589,7 +470,7 @@ public class FactionsPlugin extends JavaPlugin implements FactionsAPI {
             @Override
             public void run() {
                 try {
-                    URL url = new URL("https://update.plugin.party/check");
+                    URL url = new URI("https://update.plugin.party/check").toURL();
                     HttpURLConnection con = (HttpURLConnection) url.openConnection();
                     con.setRequestMethod("POST");
                     con.setDoOutput(true);
@@ -635,14 +516,14 @@ public class FactionsPlugin extends JavaPlugin implements FactionsAPI {
         this.metrics = new Metrics(this);
 
         // Version
-        String verString = this.getDescription().getVersion().replace("${build.number}", "selfbuilt");
-        Pattern verPattern = Pattern.compile("U([\\d.]+)-b(.*)");
+        String verString = this.getDescription().getVersion();
+        Pattern verPattern = Pattern.compile("1\\.6\\.9\\.5-U(?<version>\\d{1,2}\\.\\d{1,2}\\.\\d{1,2})(?<snap>-SNAPSHOT)?");
         Matcher matcher = verPattern.matcher(verString);
         final String fuuidVersion;
         final String fuuidBuild;
         if (matcher.find()) {
             fuuidVersion = matcher.group(1);
-            fuuidBuild = matcher.group(2) + ((likesCats || matcher.group(2).equals("selfbuilt")) ? "" : "p");
+            fuuidBuild = matcher.group("snap") == null ? (likesCats ? "release" : "yarr") : "snapshot";
         } else {
             fuuidVersion = "Unknown";
             fuuidBuild = verString;
@@ -703,7 +584,7 @@ public class FactionsPlugin extends JavaPlugin implements FactionsAPI {
         this.metricsSimplePie("luckperms_contexts", () -> "" + this.luckPermsSetup);
 
         // WorldGuard
-        IWorldguard wg = this.getWorldguard();
+        Worldguard wg = this.getWorldguard();
         String wgVersion = wg == null ? "nope" : wg.getVersion();
         this.metricsDrillPie("worldguard", () -> this.metricsInfo(wg, () -> wgVersion));
 
@@ -782,50 +663,12 @@ public class FactionsPlugin extends JavaPlugin implements FactionsAPI {
         return map;
     }
 
-    public void setWorldGuard(IWorldguard wg) {
+    public void setWorldGuard(Worldguard wg) {
         this.worldguard = wg;
     }
 
     public void loadLang() {
         File lang = new File(getDataFolder(), "lang.yml");
-        OutputStream out = null;
-        InputStream defLangStream = this.getResource("lang.yml");
-        if (!lang.exists()) {
-            try {
-                getDataFolder().mkdir();
-                lang.createNewFile();
-                if (defLangStream != null) {
-                    out = new FileOutputStream(lang);
-                    int read;
-                    byte[] bytes = new byte[1024];
-
-                    while ((read = defLangStream.read(bytes)) != -1) {
-                        out.write(bytes, 0, read);
-                    }
-                    YamlConfiguration defConfig = YamlConfiguration.loadConfiguration(new BufferedReader(new InputStreamReader(defLangStream)));
-                    TL.setFile(defConfig);
-                }
-            } catch (IOException e) {
-                getLogger().log(Level.SEVERE, "[Factions] Couldn't create language file.", e);
-                getLogger().severe("[Factions] This is a fatal error. Now disabling");
-                this.setEnabled(false); // Without it loaded, we can't send them messages
-            } finally {
-                if (defLangStream != null) {
-                    try {
-                        defLangStream.close();
-                    } catch (IOException e) {
-                        FactionsPlugin.getInstance().getLogger().log(Level.SEVERE, "Failed to close resource", e);
-                    }
-                }
-                if (out != null) {
-                    try {
-                        out.close();
-                    } catch (IOException e) {
-                        FactionsPlugin.getInstance().getLogger().log(Level.SEVERE, "Failed to close output", e);
-                    }
-                }
-            }
-        }
 
         YamlConfiguration conf = YamlConfiguration.loadConfiguration(lang);
         for (TL item : TL.values()) {
@@ -834,17 +677,10 @@ public class FactionsPlugin extends JavaPlugin implements FactionsAPI {
             }
         }
 
-        // Remove this here because I'm sick of dealing with bug reports due to bad decisions on my part.
-        if (conf.getString(TL.COMMAND_SHOW_POWER.getPath(), "").contains("%5$s")) {
-            conf.set(TL.COMMAND_SHOW_POWER.getPath(), TL.COMMAND_SHOW_POWER.getDefault());
-            log(Level.INFO, "Removed errant format specifier from f show power.");
-        }
-
         TL.setFile(conf);
         try {
             conf.save(lang);
         } catch (IOException e) {
-            getLogger().log(Level.WARNING, "Factions: Report this stack trace to drtshock.");
             FactionsPlugin.getInstance().getLogger().log(Level.SEVERE, "Failed to save lang.yml", e);
         }
     }
@@ -884,7 +720,7 @@ public class FactionsPlugin extends JavaPlugin implements FactionsAPI {
         return seeChunkUtil;
     }
 
-    public ParticleProvider getParticleProvider() {
+    public BukkitParticleProvider getParticleProvider() {
         return particleProvider;
     }
 
@@ -985,7 +821,7 @@ public class FactionsPlugin extends JavaPlugin implements FactionsAPI {
         return this.landRaidControl;
     }
 
-    public IWorldguard getWorldguard() {
+    public Worldguard getWorldguard() {
         return this.worldguard;
     }
 
@@ -1012,7 +848,7 @@ public class FactionsPlugin extends JavaPlugin implements FactionsAPI {
         return this.mvdwPlaceholderAPIManager;
     }
 
-    private GsonBuilder getGsonBuilder(boolean confNotLoaded) {
+    public GsonBuilder getGsonBuilder(boolean confNotLoaded) {
         Type mapFLocToStringSetType = new TypeToken<Map<FLocation, Set<String>>>() {
         }.getType();
 
@@ -1262,6 +1098,7 @@ public class FactionsPlugin extends JavaPlugin implements FactionsAPI {
         return this.adventure;
     }
 
+    @SuppressWarnings({"FieldCanBeLocal", "FieldMayBeFinal", "unused"})
     private static class UpdateCheck {
         private String pluginName;
         private String pluginVersion;
@@ -1278,6 +1115,7 @@ public class FactionsPlugin extends JavaPlugin implements FactionsAPI {
         }
     }
 
+    @SuppressWarnings({"unused"})
     private static class Response {
         private boolean success;
         private String message;

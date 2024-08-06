@@ -8,14 +8,13 @@ import com.massivecraft.factions.landraidcontrol.DTRControl;
 import com.massivecraft.factions.landraidcontrol.PowerControl;
 import com.massivecraft.factions.perms.Relation;
 import com.massivecraft.factions.util.TL;
-import org.apache.commons.lang.time.DurationFormatUtils;
+import org.apache.commons.lang3.time.DurationFormatUtils;
 
 import java.util.function.BiFunction;
 import java.util.function.Function;
 
 public enum FactionTag implements Tag {
-    @SuppressWarnings("Convert2MethodRef")
-    INTERNAL_ID("faction-internal-id", (fac) -> fac.getId()),
+    INTERNAL_ID("faction-internal-id", (fac) -> String.valueOf(fac.getIntId())),
     HOME_X("x", (fac) -> fac.hasHome() ? String.valueOf(fac.getHome().getBlockX()) : Tag.isMinimalShow() ? null : "{ig}"),
     HOME_Y("y", (fac) -> fac.hasHome() ? String.valueOf(fac.getHome().getBlockY()) : Tag.isMinimalShow() ? null : "{ig}"),
     HOME_Z("z", (fac) -> fac.hasHome() ? String.valueOf(fac.getHome().getBlockZ()) : Tag.isMinimalShow() ? null : "{ig}"),
@@ -33,7 +32,6 @@ public enum FactionTag implements Tag {
         return fAdmin == null ? TL.TAG_LEADER_OWNERLESS.toString() : fAdmin.getName().substring(0, fAdmin.getName().length() > 14 ? 13 : fAdmin.getName().length());
     }),
     JOINING("joining", (fac) -> (fac.getOpen() ? TL.COMMAND_SHOW_UNINVITED.toString() : TL.COMMAND_SHOW_INVITATION.toString())),
-    @SuppressWarnings("Convert2MethodRef")
     FACTION("faction", (fac) -> fac.getTag()),
     FACTION_RELATION_COLOR("faction-relation-color", (fac, fp) -> fp == null ? "" : fp.getColorStringTo(fac)),
     HOME_WORLD("world", (fac) -> fac.hasHome() ? fac.getHome().getWorld().getName() : Tag.isMinimalShow() ? null : "{ig}"),

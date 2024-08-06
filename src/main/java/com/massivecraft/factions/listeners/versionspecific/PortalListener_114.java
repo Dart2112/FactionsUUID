@@ -34,11 +34,10 @@ public class PortalListener_114 implements Listener {
             return; // Don't do anything if they don't want us to.
         }
 
-        if (!(entity instanceof Player) || !plugin.worldUtil().isEnabled(event.getEntity().getWorld())) {
+        if (!(entity instanceof Player player) || !plugin.worldUtil().isEnabled(event.getEntity().getWorld())) {
             return;
         }
 
-        Player player = (Player) entity;
         FPlayer fPlayer = FPlayers.getInstance().getByPlayer(player);
 
         // Only 8 blocks so a loop should be fine.
@@ -63,6 +62,5 @@ public class PortalListener_114 implements Listener {
                 return;
             }
         }
-
     }
 }

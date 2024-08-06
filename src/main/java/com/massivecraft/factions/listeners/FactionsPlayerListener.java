@@ -12,6 +12,7 @@ import com.massivecraft.factions.event.FPlayerJoinEvent;
 import com.massivecraft.factions.event.FPlayerLeaveEvent;
 import com.massivecraft.factions.gui.GUI;
 import com.massivecraft.factions.integration.Graves;
+import com.massivecraft.factions.perms.PermissibleAction;
 import com.massivecraft.factions.perms.PermissibleActions;
 import com.massivecraft.factions.perms.Relation;
 import com.massivecraft.factions.perms.Role;
@@ -37,6 +38,7 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryDragEvent;
+import org.bukkit.event.player.PlayerArmorStandManipulateEvent;
 import org.bukkit.event.player.PlayerBucketEmptyEvent;
 import org.bukkit.event.player.PlayerBucketFillEvent;
 import org.bukkit.event.player.PlayerChangedWorldEvent;
@@ -50,6 +52,7 @@ import org.bukkit.event.player.PlayerLoginEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
+import org.bukkit.event.player.PlayerTakeLecternBookEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryView;
@@ -62,7 +65,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.logging.Level;
-
 
 public class FactionsPlayerListener extends AbstractListener {
 
@@ -96,8 +98,9 @@ public class FactionsPlayerListener extends AbstractListener {
             long diff = System.currentTimeMillis() - me.getLastLoginTime();
             MainConfig.Factions.Protection.TerritoryTeleport terry = this.plugin.conf().factions().protection().territoryTeleport();
             if (diff > (1000L * terry.getTimeSinceLastSignedIn())) {
-                Relation relation = me.getRelationTo(Board.getInstance().getFactionAt(standing));
-                if (terry.isRelationToTeleportOut(relation)) {
+                Faction standingFaction = Board.getInstance().getFactionAt(standing);
+                Relation relation = me.getRelationTo(standingFaction);
+                if (terry.isRelationToTeleportOut(relation, standingFaction)) {
                     Location target = null;
                     for (String destination : terry.getDestination().split(",")) {
                         switch (destination.trim().toLowerCase()) {
@@ -113,14 +116,14 @@ public class FactionsPlayerListener extends AbstractListener {
                                 }
                                 break;
                             case "bed":
-                                target = player.getBedSpawnLocation();
+                                target = player.getRespawnLocation();
                         }
                         if (target != null) {
                             break;
                         }
                     }
                     if (target == null) {
-                        target = this.plugin.getServer().getWorlds().get(0).getSpawnLocation();
+                        target = this.plugin.getServer().getWorlds().getFirst().getSpawnLocation();
                     }
                     this.plugin.teleport(player, target).thenAccept(success -> {
                         if (success) {
@@ -366,22 +369,23 @@ public class FactionsPlayerListener extends AbstractListener {
 
         boolean check = false;
         EntityType type = event.getRightClicked().getType();
-        String entityName = type.name();
-        if (entityName.contains("ITEM_FRAME")) {
+        if (type == EntityType.ITEM_FRAME ||  type == EntityType.GLOW_ITEM_FRAME) {
             if (!canPlayerUseBlock(event.getPlayer(), Material.ITEM_FRAME, event.getRightClicked().getLocation(), false)) {
                 event.setCancelled(true);
             }
-        } else if (entityName.contains("HORSE") ||
-                entityName.equals("DONKEY") ||
-                entityName.equals("MULE") ||
-                entityName.equals("LLAMA") ||
-                entityName.equals("TRADER_LLAMA") ||
-                entityName.equals("PIG") ||
-                entityName.equals("LEASH_HITCH") ||
-                entityName.equals("MINECART_CHEST") ||
-                entityName.equals("MINECART_FURNACE") ||
-                entityName.equals("MINECART_HOPPER") ||
-                entityName.equals("CHEST_BOAT")
+        } else if (type == EntityType.HORSE ||
+                type == EntityType.SKELETON_HORSE ||
+                type == EntityType.ZOMBIE_HORSE ||
+                type == EntityType.DONKEY ||
+                type == EntityType.MULE ||
+                type == EntityType.LLAMA ||
+                type == EntityType.TRADER_LLAMA ||
+                type == EntityType.PIG ||
+                type == EntityType.LEASH_HITCH ||
+                type == EntityType.MINECART_CHEST ||
+                type == EntityType.MINECART_FURNACE ||
+                type == EntityType.MINECART_HOPPER ||
+                type == EntityType.CHEST_BOAT
         ) {
             check = true;
         }
@@ -414,7 +418,7 @@ public class FactionsPlayerListener extends AbstractListener {
             return;
         }
 
-        if (event.getAction() == Action.PHYSICAL && block.getType().name().contains("SOIL")) {
+        if (event.getAction() == Action.PHYSICAL && block.getType() == Material.FARMLAND) {
             if (!FactionsBlockListener.playerCanBuildDestroyBlock(player, block.getLocation(), PermissibleActions.DESTROY, false)) {
                 event.setCancelled(true);
             }
@@ -448,8 +452,9 @@ public class FactionsPlayerListener extends AbstractListener {
 
         ItemStack item;
         if ((item = event.getItem()) != null) {
+            Material material = item.getType();
             String materialName = item.getType().name();
-            if (materialName.equals("ARMOR_STAND") || materialName.equals("END_CRYSTAL") || materialName.contains("MINECART")) {
+            if (material == Material.ARMOR_STAND || material == Material.END_CRYSTAL || materialName.contains("MINECART")) {
                 if (!FactionsPlugin.getInstance().conf().factions().specialCase().getIgnoreBuildMaterials().contains(item.getType()) &&
                         !FactionsBlockListener.playerCanBuildDestroyBlock(event.getPlayer(), event.getClickedBlock().getRelative(event.getBlockFace()).getLocation(), PermissibleActions.BUILD, false)) {
                     event.setCancelled(true);
@@ -640,6 +645,42 @@ public class FactionsPlayerListener extends AbstractListener {
         }
     }
 
+    @EventHandler(ignoreCancelled = true)
+    public void doYouHaveALibraryCard(PlayerTakeLecternBookEvent event) {
+        Player player = event.getPlayer();
+        if (this.plugin.conf().factions().protection().getPlayersWhoBypassAllProtection().contains(player.getName())) {
+            return;
+        }
+
+        FPlayer me = FPlayers.getInstance().getByPlayer(player);
+        if (me.isAdminBypassing()) {
+            return;
+        }
+
+        FLocation location = new FLocation(event.getLectern().getLocation());
+        Faction otherFaction = Board.getInstance().getFactionAt(location);
+        if (this.plugin.getLandRaidControl().isRaidable(otherFaction)) {
+            return;
+        }
+
+        PermissibleAction action = PermissibleActions.CONTAINER;
+        if (!otherFaction.hasAccess(me, action, location)) {
+            me.msg(TL.GENERIC_NOPERMISSION, action.getShortDescription());
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = true)
+    public void onPlayerInteract(PlayerArmorStandManipulateEvent event) {
+        if (!plugin.worldUtil().isEnabled(event.getPlayer().getWorld())) {
+            return;
+        }
+
+        if (!canPlayerUseBlock(event.getPlayer(), Material.ARMOR_STAND, event.getRightClicked().getLocation(), false)) {
+            event.setCancelled(true);
+        }
+    }
+
     public static boolean preventCommand(String fullCmd, Player player) {
         MainConfig.Factions.Protection protection = FactionsPlugin.getInstance().conf().factions().protection();
         if ((protection.getTerritoryNeutralDenyCommands().isEmpty() &&
@@ -731,9 +772,8 @@ public class FactionsPlayerListener extends AbstractListener {
         if (clickedInventory == null) {
             return;
         }
-        if (clickedInventory.getHolder() instanceof GUI) {
+        if (clickedInventory.getHolder() instanceof GUI<?> ui) {
             event.setCancelled(true);
-            GUI<?> ui = (GUI<?>) clickedInventory.getHolder();
             ui.click(event.getRawSlot(), event.getClick());
         }
     }

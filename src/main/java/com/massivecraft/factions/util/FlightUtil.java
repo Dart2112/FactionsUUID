@@ -7,6 +7,7 @@ import com.massivecraft.factions.perms.Relation;
 import com.massivecraft.factions.struct.Permission;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.Particle;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
 
@@ -47,7 +48,7 @@ public class FlightUtil {
         }
     }
 
-    public class EnemiesTask extends BukkitRunnable {
+    public static class EnemiesTask extends BukkitRunnable {
 
         @Override
         public void run() {
@@ -94,7 +95,7 @@ public class FlightUtil {
         }
     }
 
-    public class ParticleTrailsTask extends BukkitRunnable {
+    public static class ParticleTrailsTask extends BukkitRunnable {
 
         private final int amount;
         private final float speed;
@@ -110,7 +111,7 @@ public class FlightUtil {
                 FPlayer pilot = FPlayers.getInstance().getByPlayer(player);
                 if (pilot.isFlying()) {
                     if (pilot.getFlyTrailsEffect() != null && Permission.FLY_TRAILS.has(player) && pilot.getFlyTrailsState()) {
-                        Object effect = FactionsPlugin.getInstance().getParticleProvider().effectFromString(pilot.getFlyTrailsEffect());
+                        Particle effect = FactionsPlugin.getInstance().getParticleProvider().effectFromString(pilot.getFlyTrailsEffect());
                         FactionsPlugin.getInstance().getParticleProvider().spawn(effect, player.getLocation(), amount, speed, 0, 0, 0);
                     }
                 }

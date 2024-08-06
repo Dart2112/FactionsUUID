@@ -29,9 +29,7 @@ import com.massivecraft.factions.struct.Permission;
 import com.massivecraft.factions.tag.Tag;
 import com.massivecraft.factions.util.RelationUtil;
 import com.massivecraft.factions.util.TL;
-import com.massivecraft.factions.util.TitleAPI;
 import com.massivecraft.factions.util.WarmUpUtil;
-import com.massivecraft.factions.lib.mkremins.fanciful.FancyMessage;
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
@@ -43,6 +41,7 @@ import org.bukkit.metadata.MetadataValue;
 import org.bukkit.scheduler.BukkitRunnable;
 
 import java.io.InputStreamReader;
+import java.net.URI;
 import java.net.URL;
 import java.util.HashSet;
 import java.util.List;
@@ -63,7 +62,7 @@ import java.util.UUID;
 
 public abstract class MemoryFPlayer implements FPlayer {
 
-    protected String factionId;
+    protected int factionId;
     protected Role role;
     protected String title;
     protected double power;
@@ -110,24 +109,25 @@ public abstract class MemoryFPlayer implements FPlayer {
     }
 
     public Faction getFaction() {
-        if (this.factionId == null) {
-            this.factionId = "0";
-        }
         Faction faction = Factions.getInstance().getFactionById(this.factionId);
         if (faction == null) {
             FactionsPlugin.getInstance().getLogger().warning("Found null faction (id " + this.factionId + ") for player " + this.getName());
-            this.factionId = "0";
+            this.factionId = 0;
             faction = Factions.getInstance().getFactionById(this.factionId);
         }
         return faction;
     }
 
     public String getFactionId() {
+        return String.valueOf(this.factionId);
+    }
+
+    public int getFactionIntId() {
         return this.factionId;
     }
 
     public boolean hasFaction() {
-        return !factionId.equals("0");
+        return factionId != 0;
     }
 
     public void setFaction(Faction faction) {
@@ -136,7 +136,7 @@ public abstract class MemoryFPlayer implements FPlayer {
             oldFaction.removeFPlayer(this);
         }
         faction.addFPlayer(this);
-        this.factionId = faction.getId();
+        this.factionId = faction.getIntId();
     }
 
     public void setMonitorJoins(boolean monitor) {
@@ -255,7 +255,7 @@ public abstract class MemoryFPlayer implements FPlayer {
     }
 
     public ChatMode getChatMode() {
-        if (this.chatMode == null || this.factionId.equals("0") || !FactionsPlugin.getInstance().conf().factions().chat().isFactionOnlyChat()) {
+        if (this.chatMode == null || this.factionId == 0 || !FactionsPlugin.getInstance().conf().factions().chat().isFactionOnlyChat()) {
             this.chatMode = ChatMode.PUBLIC;
         }
         return chatMode;
@@ -314,11 +314,12 @@ public abstract class MemoryFPlayer implements FPlayer {
         this.deaths = 0;
         this.mapHeight = FactionsPlugin.getInstance().conf().map().getHeight();
 
-        if (!FactionsPlugin.getInstance().conf().factions().other().getNewPlayerStartingFactionID().equals("0") && Factions.getInstance().isValidFactionId(FactionsPlugin.getInstance().conf().factions().other().getNewPlayerStartingFactionID())) {
+        if (FactionsPlugin.getInstance().conf().factions().other().getNewPlayerStartingFactionID() > 0 && Factions.getInstance().isValidFactionId(FactionsPlugin.getInstance().conf().factions().other().getNewPlayerStartingFactionID())) {
             this.factionId = FactionsPlugin.getInstance().conf().factions().other().getNewPlayerStartingFactionID();
         }
     }
 
+    @Deprecated
     public MemoryFPlayer(MemoryFPlayer other) {
         this.factionId = other.factionId;
         this.id = other.id;
@@ -341,7 +342,7 @@ public abstract class MemoryFPlayer implements FPlayer {
 
     public void resetFactionData(boolean doSpoutUpdate) {
         // clean up any territory ownership in old faction, if there is one
-        if (factionId != null && Factions.getInstance().isValidFactionId(this.getFactionId())) {
+        if (Factions.getInstance().isValidFactionId(this.getFactionIntId())) {
             Faction currentFaction = this.getFaction();
             currentFaction.removeFPlayer(this);
             if (currentFaction.isNormal()) {
@@ -349,7 +350,7 @@ public abstract class MemoryFPlayer implements FPlayer {
             }
         }
 
-        this.factionId = "0"; // The default neutral faction
+        this.factionId = 0; // The default neutral faction
         this.chatMode = ChatMode.PUBLIC;
         this.role = Role.NORMAL;
         this.title = "";
@@ -457,7 +458,7 @@ public abstract class MemoryFPlayer implements FPlayer {
                         @Override
                         public void run() {
                             try {
-                                URL url = new URL("https://sessionserver.mojang.com/session/minecraft/profile/" + uuid);
+                                URL url = new URI("https://sessionserver.mojang.com/session/minecraft/profile/" + uuid).toURL();
                                 NameLookup lookup = FactionsPlugin.getInstance().getGson().fromJson(new InputStreamReader(url.openStream()), NameLookup.class);
                                 String newName = lookup.name;
                                 new BukkitRunnable() {
@@ -486,7 +487,7 @@ public abstract class MemoryFPlayer implements FPlayer {
 
     public String getNameAndSomething(String something) {
         String ret = this.role.getPrefix();
-        if (something != null && something.length() > 0) {
+        if (something != null && !something.isEmpty()) {
             ret += something + " ";
         }
         ret += this.getName();
@@ -574,7 +575,7 @@ public abstract class MemoryFPlayer implements FPlayer {
 
     @Override
     public String getColorStringTo(RelationParticipator rp) {
-        return RelationUtil.getColorStringOfThatToMe(this,rp);
+        return RelationUtil.getColorStringOfThatToMe(this, rp);
     }
 
     //----------------------------------------------//
@@ -715,7 +716,7 @@ public abstract class MemoryFPlayer implements FPlayer {
 
             // We send null instead of empty because Spigot won't touch the title if it's null, but clears if empty.
             // We're just trying to be as unintrusive as possible.
-            TitleAPI.getInstance().sendTitle(player, title, sub, in, stay, out);
+            player.sendTitle(title, sub, in, stay, out);
 
             showChat = FactionsPlugin.getInstance().conf().factions().enterTitles().isAlsoShowChat();
         }
@@ -831,9 +832,9 @@ public abstract class MemoryFPlayer implements FPlayer {
             }
 
             FactionsPlugin.getInstance().getServer().getPluginManager().callEvent(new FactionAutoDisbandEvent(myFaction));
-            Factions.getInstance().removeFaction(myFaction.getId());
+            Factions.getInstance().removeFaction(myFaction);
             if (FactionsPlugin.getInstance().conf().logging().isFactionDisband()) {
-                FactionsPlugin.getInstance().log(TL.LEAVE_DISBANDEDLOG.format(myFaction.getTag(), myFaction.getId(), this.getName()));
+                FactionsPlugin.getInstance().log(TL.LEAVE_DISBANDEDLOG.format(myFaction.getTag(), "" + myFaction.getIntId(), this.getName()));
             }
         }
     }
@@ -1078,7 +1079,7 @@ public abstract class MemoryFPlayer implements FPlayer {
 
         if (!this.hasFaction()) {
             if (notifyFailure) {
-                this.msg("You are not member of any faction.");
+                this.msg(TL.COMMAND_UNCLAIM_NOTAMEMBER);
             }
             return false;
         }
@@ -1131,7 +1132,7 @@ public abstract class MemoryFPlayer implements FPlayer {
         return this.hasFaction() ||
                 (FactionsPlugin.getInstance().getLandRaidControl() instanceof PowerControl &&
                         (this.getPowerRounded() != FactionsPlugin.getInstance().conf().factions().landRaidControl().power().getPlayerStarting() ||
-                        this.getPowerBoost() != 0));
+                                this.getPowerBoost() != 0));
     }
 
     public void msg(String str, Object... args) {
@@ -1304,26 +1305,6 @@ public abstract class MemoryFPlayer implements FPlayer {
     public void sendMessage(List<String> msgs) {
         for (String msg : msgs) {
             this.sendMessage(msg);
-        }
-    }
-
-    public void sendFancyMessage(FancyMessage message) {
-        Player player = getPlayer();
-        if (player == null) {
-            return;
-        }
-
-        message.send(player);
-    }
-
-    public void sendFancyMessage(List<FancyMessage> messages) {
-        Player player = getPlayer();
-        if (player == null) {
-            return;
-        }
-
-        for (FancyMessage msg : messages) {
-            msg.send(player);
         }
     }
 

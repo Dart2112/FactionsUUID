@@ -7,7 +7,7 @@ import com.massivecraft.factions.util.TL;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.ArgumentBuilder;
 import com.mojang.brigadier.builder.RequiredArgumentBuilder;
-import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.bukkit.ChatColor;
 import org.bukkit.entity.Player;
 
@@ -48,7 +48,7 @@ public class CmdAnnounce extends FCommand {
         return TL.COMMAND_ANNOUNCE_DESCRIPTION;
     }
 
-    protected class AnnounceBrigadier implements BrigadierProvider {
+    protected static class AnnounceBrigadier implements BrigadierProvider {
         @Override
         public ArgumentBuilder<Object, ?> get(ArgumentBuilder<Object, ?> parent) {
             return parent.then(RequiredArgumentBuilder.argument("message", StringArgumentType.greedyString()));

@@ -19,7 +19,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 
 public class CmdTop extends FCommand {
 
@@ -72,7 +71,7 @@ public class CmdTop extends FCommand {
                 .filter(Faction::isNormal)
                 .map(f -> new FTopFacValPair(f, ftopGenerator.apply(f)))
                 .sorted()
-                .collect(Collectors.toList());
+                .toList();
 
         int sortedFactionsCount = sortedFactions.size();
 

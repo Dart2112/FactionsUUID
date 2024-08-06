@@ -38,8 +38,8 @@ public class CmdKick extends FCommand {
             for (FPlayer player : context.faction.getFPlayersWhereRole(Role.NORMAL)) {
                 String s = player.getName();
                 component = component.append(Component.text().color(NamedTextColor.WHITE).content(s + " ")
-                        .hoverEvent(legacy.deserialize(TL.COMMAND_KICK_CLICKTOKICK.toString() + s).asHoverEvent())
-                        .clickEvent(ClickEvent.runCommand("/" + FactionsPlugin.getInstance().conf().getCommandBase().get(0) + " kick " + s))
+                        .hoverEvent(legacy.deserialize(TL.COMMAND_KICK_CLICKTOKICK + s).asHoverEvent())
+                        .clickEvent(ClickEvent.runCommand("/" + FactionsPlugin.getInstance().conf().getCommandBase().getFirst() + " kick " + s))
                 );
             }
             if (context.fPlayer.getRole().isAtLeast(Role.COLEADER)) {
@@ -47,8 +47,8 @@ public class CmdKick extends FCommand {
                 for (FPlayer player : context.faction.getFPlayersWhereRole(Role.MODERATOR)) {
                     String s = player.getName();
                     component = component.append(Component.text().color(NamedTextColor.GRAY).content(s + " ")
-                            .hoverEvent(legacy.deserialize(TL.COMMAND_KICK_CLICKTOKICK.toString() + s).asHoverEvent())
-                            .clickEvent(ClickEvent.runCommand("/" + FactionsPlugin.getInstance().conf().getCommandBase().get(0) + " kick " + s))
+                            .hoverEvent(legacy.deserialize(TL.COMMAND_KICK_CLICKTOKICK + s).asHoverEvent())
+                            .clickEvent(ClickEvent.runCommand("/" + FactionsPlugin.getInstance().conf().getCommandBase().getFirst() + " kick " + s))
                     );
                 }
                 if (context.fPlayer.getRole() == Role.ADMIN) {
@@ -56,8 +56,8 @@ public class CmdKick extends FCommand {
                     for (FPlayer player : context.faction.getFPlayersWhereRole(Role.COLEADER)) {
                         String s = player.getName();
                         component = component.append(Component.text().color(NamedTextColor.RED).content(s + " ")
-                                .hoverEvent(legacy.deserialize(TL.COMMAND_KICK_CLICKTOKICK.toString() + s).asHoverEvent())
-                                .clickEvent(ClickEvent.runCommand("/" + FactionsPlugin.getInstance().conf().getCommandBase().get(0) + " kick " + s))
+                                .hoverEvent(legacy.deserialize(TL.COMMAND_KICK_CLICKTOKICK + s).asHoverEvent())
+                                .clickEvent(ClickEvent.runCommand("/" + FactionsPlugin.getInstance().conf().getCommandBase().getFirst() + " kick " + s))
                         );
                     }
                 }
@@ -69,7 +69,7 @@ public class CmdKick extends FCommand {
 
         if (context.fPlayer == toKick) {
             context.msg(TL.COMMAND_KICK_SELF);
-            context.msg(TL.GENERIC_YOUMAYWANT.toString() + FCmdRoot.getInstance().cmdLeave.getUsageTemplate(context));
+            context.msg(TL.GENERIC_YOUMAYWANT + FCmdRoot.getInstance().cmdLeave.getUsageTemplate(context));
             return;
         }
 

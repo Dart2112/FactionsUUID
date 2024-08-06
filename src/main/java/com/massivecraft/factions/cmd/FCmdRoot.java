@@ -22,7 +22,6 @@ import com.massivecraft.factions.cmd.role.CmdPromote;
 import com.massivecraft.factions.landraidcontrol.DTRControl;
 import com.massivecraft.factions.landraidcontrol.PowerControl;
 import com.massivecraft.factions.util.TL;
-import io.papermc.lib.PaperLib;
 import me.lucko.commodore.CommodoreProvider;
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
@@ -291,6 +290,6 @@ public class FCmdRoot extends FCommand implements CommandExecutor {
     }
 
     private boolean canCommodore() {
-        return (FactionsPlugin.getMCVersion() < 1900 || PaperLib.isPaper()) && CommodoreProvider.isSupported();
+        return CommodoreProvider.isSupported();
     }
 }
