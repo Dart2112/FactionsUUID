@@ -4,7 +4,7 @@
 
     <groupId>dev.kitteh</groupId>
     <artifactId>factionsuuid</artifactId>
-    <version>0.7.5</version>
+    <version>0.7.6</version>
     <packaging>jar</packaging>
 
     <name>FactionsUUID</name>
@@ -127,6 +127,14 @@
                 <exclusion>
                     <groupId>org.jetbrains</groupId>
                     <artifactId>annotations</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>com.google.code.gson</groupId>
+                    <artifactId>gson</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>com.google.auto.service</groupId>
+                    <artifactId>auto-service-annotations</artifactId>
                 </exclusion>
             </exclusions>
         </dependency>
